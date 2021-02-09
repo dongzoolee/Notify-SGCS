@@ -1,5 +1,5 @@
 # Notify-SGCS
-[![서강대학교 컴퓨터공학과 공지](https://cs.sogang.ac.kr/front/cmsboardlist.do?siteId=cs&bbsConfigFK=1905)]가 업데이트되면 슬랙 메세지로 공지해주는 앱입니다.
+<a href="https://cs.sogang.ac.kr/front/cmsboardlist.do?siteId=cs&bbsConfigFK=1905">서강대학교 컴퓨터공학과 공지</a>가 업데이트되면 슬랙 메세지로 공지해주는 앱입니다.
 
 [사용법]
  - 알림 받기 : /on {세부 공지}

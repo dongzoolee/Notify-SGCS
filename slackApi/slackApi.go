@@ -1,10 +1,11 @@
 package SlackApi
 
 import (
-	"github.com/joho/godotenv"
-	"github.com/slack-go/slack"
 	"log"
 	"os"
+	"github.com/joho/godotenv"
+	"github.com/slack-go/slack"
+	"updateDB"
 )
 
 func GetEnv(key string) string {
@@ -20,9 +21,8 @@ func ErrCheck(e error) {
 	}
 }
 
-var api = slack.New(GetEnv("BOT_TOKEN"))
 
-func SendMsg(channel string, boardType string, title string, url string) {
+func SendMsg(receiverInfo updateDB.ChannelWrap, boardType string, title string, url string) {
 	if boardType == "main" {
 		boardType = "주요공지"
 	} else if boardType == "underg" {
@@ -36,7 +36,10 @@ func SendMsg(channel string, boardType string, title string, url string) {
 	} else if boardType == "sgcs" {
 		boardType = "학과소식"
 	}
+	var api = slack.New(receiverInfo.TeamToken)
 	var blocks []slack.Block
-	blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "*"+boardType+"가 업데이트 되었습니다.*\n> <"+url+"|"+title+">", false, false), nil, nil))
-	api.PostMessage(channel, slack.MsgOptionBlocks(blocks...))
+	blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "*"+boardType+"가 업데이트 되었습니다.*", false, false), nil, nil))
+	blocks = append(blocks, slack.NewDividerBlock())
+	blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "<"+url+"|"+title+">", false, false), nil, nil))
+	api.PostMessage(receiverInfo.ChannelID, slack.MsgOptionBlocks(blocks...))
 }

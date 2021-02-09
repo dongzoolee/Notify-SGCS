@@ -1,19 +1,20 @@
 package main
 
 import (
-	"checkUpdate"
+	checkupdate "checkUpdate"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
-	"github.com/slack-go/slack"
-	"github.com/slack-go/slack/slackevents"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"updateDB"
+
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+	"github.com/slack-go/slack"
+	"github.com/slack-go/slack/slackevents"
 	// "updateDB"
 )
 
@@ -25,7 +26,7 @@ func ErrCheck(e error) {
 		panic(e)
 	}
 }
-func getEnv(key string) string {
+func Getenv(key string) string {
 	err := godotenv.Load("./.env")
 	if err != nil {
 		panic(err)
@@ -33,14 +34,14 @@ func getEnv(key string) string {
 	return os.Getenv(key)
 }
 
-var api = slack.New(getEnv("BOT_TOKEN"))
+var api = slack.New(Getenv("BOT_TOKEN"))
 
 func main() {
 	h := mux.NewRouter()
 	go checkupdate.Init()
 
 	// INIT SLACK API
-	signingSecret := getEnv("SLACK_SIGNING_SECRET")
+	signingSecret := Getenv("SLACK_SIGNING_SECRET")
 	h.HandleFunc("/event-endpoint", func(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -97,16 +98,42 @@ func main() {
 			}
 		}
 	})
-	// GET DATA
 
-	// HTTP INIT
+	// SETTING INSTALL PAGE
 	h.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Welcome to Main Page")
+		http.Redirect(w, r, "https://csnotice.soga.ng/install", 301)
 	})
+	h.HandleFunc("/install", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://slack.com/oauth/v2/authorize?client_id="+Getenv("SLACK_CLIENT_ID")+"&scope=chat%3Awrite+commands+chat%3Awrite.public+im%3Awrite", 301)
+	})
+	h.HandleFunc("/oauth", func(w http.ResponseWriter, r *http.Request) {
+		query := strings.Split(r.URL.RawQuery, "?")
+		code := strings.Split(query[0], "&")[0]
+		queryOfCode := strings.Split(code, "=")[1]
+		resp, err := http.Get("https://slack.com/api/oauth.v2.access?client_id=" + Getenv("SLACK_CLIENT_ID") + "&client_secret=" + Getenv("SLACK_CLIENT_SECRET") + "&code=" + queryOfCode)
+		ErrCheck(err)
+		defer resp.Body.Close()
+
+		result, err := ioutil.ReadAll(resp.Body)
+		ErrCheck(err)
+		var res map[string]interface{}
+		json.Unmarshal([]byte(result), &res)
+		updateDB.SetTeamToken(res["team"].(map[string]interface{})["id"].(string), res["access_token"].(string))
+		http.Redirect(w, r, "/installsuccess", 301)
+	})
+	h.HandleFunc("/installsuccess", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Successfully Installed in your workspace"))
+	})
+
+	// RECEIVE SLASH EVENTS
 	h.HandleFunc("/msg", func(w http.ResponseWriter, r *http.Request) {
 		result, err := ioutil.ReadAll(r.Body)
 		ErrCheck(err)
 		body := strings.Split(string(result), "&")
+		// fmt.Println(body)
+		if len(body) == 0 {
+			return
+		}
 		channelID, err := url.QueryUnescape(strings.Split(body[3], "=")[1])
 		ErrCheck(err)
 		cmd, err := url.QueryUnescape(strings.Split(body[7], "=")[1])
@@ -127,17 +154,32 @@ func main() {
 		} else if text == "sgcs" {
 			boardType = "학과소식"
 		}
+		var api = slack.New(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
+		// fmt.Println(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
 		if cmd[1:] == "on" {
-			if updateDB.AddChannel(channelID, text) {
-				api.PostMessage(channelID, slack.MsgOptionText(boardType+" 업데이트에 대한 알림을 받습니다.", false))
+			// fmt.Println(body)
+			if updateDB.AddChannel(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]), strings.Split(body[1], "=")[1], channelID, text) {
+				// resp, err := http.PostForm("https://slack.com/api/chat.postMessage", url.Values{"token": {"xoxb-1691653951013-1729473312866-18XAO49tpUhwGWVgvy1IrLsa"}, "channel": {channelID}, "blocks": {`[{"type": "section", "text": {"type": "plain_text", "text": "Hello world"}}]`}})
+				// ErrCheck(err)
+				// respBody, err := ioutil.ReadAll(resp.Body)
+				// ErrCheck(err)
+				// if err == nil {
+				// 	str := string(respBody)
+				// 	fmt.Println(str)
+				// }
+				_, _, err = api.PostMessage(channelID, slack.MsgOptionText(boardType+" 업데이트에 대한 알림을 받습니다.", false))
+				ErrCheck(err)
 			} else {
-				api.PostMessage(channelID, slack.MsgOptionText("이미 "+boardType+" 업데이트에 대한 알림을 받고 있습니다.", false))
+				_, _, err := api.PostMessage(channelID, slack.MsgOptionText("이미 "+boardType+" 업데이트에 대한 알림을 받고 있습니다.", false))
+				ErrCheck(err)
 			}
 		} else if cmd[1:] == "off" {
 			if updateDB.RemoveChannel(channelID, text) {
 				api.PostMessage(channelID, slack.MsgOptionText(boardType+" 업데이트에 대한 알림을 더 이상 받지 않습니다.", false))
+				ErrCheck(err)
 			} else {
 				api.PostMessage(channelID, slack.MsgOptionText("이미 "+boardType+" 업데이트에 대한 알림을 받지 않고 있습니다.", false))
+				ErrCheck(err)
 			}
 		}
 	})

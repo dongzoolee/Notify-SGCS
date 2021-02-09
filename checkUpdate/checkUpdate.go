@@ -23,6 +23,10 @@ type PKID struct {
 	Job     string
 	Sgcs    string
 }
+type ChannelWrap struct {
+	ChannelID string
+	TeamToken string
+}
 
 func ErrCheck(e error) {
 	if e != nil {
@@ -30,7 +34,7 @@ func ErrCheck(e error) {
 	}
 }
 func Init() {
-	t := time.NewTicker(10 * time.Second)
+	t := time.NewTicker(20 * time.Second)
 	for range t.C {
 		MapDatas("main")
 		MapDatas("underg")
@@ -41,13 +45,12 @@ func Init() {
 	}
 }
 func MapDatas(boardType string) {
-	var channelIDList []string = updateDB.GetChannels(boardType)
-
+	var channelIDList = updateDB.GetChannels(boardType)
 	chk, ret := CmpPKID(boardType)
 	if chk {
-		for _, id := range channelIDList {
+		for _, receiverInfo := range channelIDList {
 			for _, val := range ret {
-				SlackApi.SendMsg(id, boardType, val.Title, val.Url)
+				SlackApi.SendMsg(receiverInfo, boardType, val.Title, val.Url)
 			}
 		}
 	}
@@ -129,7 +132,7 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 	} else if boardType == "sgcs" {
 		unMshedD1.Sgcs = newTopPostID
 	}
-
+	
 	mshedD1, err := json.Marshal(unMshedD1)
 	ErrCheck(err)
 	err = ioutil.WriteFile("./checkUpdate/pkid.json", mshedD1, 0644)

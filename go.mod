@@ -10,7 +10,6 @@ replace checkUpdate => ./checkUpdate
 
 require (
 	checkUpdate v0.0.0-00010101000000-000000000000
-	github.com/anaskhan96/soup v1.2.4
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.3.0

@@ -121,14 +121,17 @@ func SetTeamToken(teamID string, teamToken string) bool {
 
 	// TeamID is alreay in DB
 	if chk == true {
-		return false
+		rows, err = db.Query("UPDATE teamInfo SET teamToken = ? WHERE teamID = ?", teamToken, teamID)
+		ErrCheck(err)
+		defer db.Close()
+		rows.Close()
+	} else {
+		// Newly added TeamID
+		rows, err = db.Query("INSERT INTO teamInfo(teamID, teamToken) VALUES(?, ?)", teamID, teamToken)
+		ErrCheck(err)
+		defer db.Close()
+		rows.Close()
 	}
-	// Newly added TeamID
-	rows, err = db.Query("INSERT INTO teamInfo(teamID, teamToken) VALUES(?, ?)", teamID, teamToken)
-	ErrCheck(err)
-	defer db.Close()
-	rows.Close()
-
 	return true
 }
 func GetTeamToken(teamID string) string {

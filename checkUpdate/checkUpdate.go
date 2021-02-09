@@ -34,7 +34,8 @@ func ErrCheck(e error) {
 	}
 }
 func Init() {
-	t := time.NewTicker(20 * time.Second)
+	
+	t := time.NewTicker(3 * time.Minute)
 	for range t.C {
 		MapDatas("main")
 		MapDatas("underg")

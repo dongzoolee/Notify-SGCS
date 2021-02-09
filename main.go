@@ -118,6 +118,7 @@ func main() {
 		ErrCheck(err)
 		var res map[string]interface{}
 		json.Unmarshal([]byte(result), &res)
+		fmt.Println(res)
 		updateDB.SetTeamToken(res["team"].(map[string]interface{})["id"].(string), res["access_token"].(string))
 		http.Redirect(w, r, "/installsuccess", 301)
 	})
@@ -134,8 +135,14 @@ func main() {
 		if len(body) == 0 {
 			return
 		}
-		channelID, err := url.QueryUnescape(strings.Split(body[3], "=")[1])
-		ErrCheck(err)
+
+		// DM의 경우, 사용자 ID로 메세지를 보내야하고,
+		var channelID string
+		if strings.Split(body[4], "=")[1] == "directmessage" {
+			channelID = strings.Split(body[5], "=")[1]
+		}else{ // 일반 채널은 채널 ID로 메세지를 보내야 합니다.
+			channelID = strings.Split(body[3], "=")[1]
+		}
 		cmd, err := url.QueryUnescape(strings.Split(body[7], "=")[1])
 		ErrCheck(err)
 		text, err := url.QueryUnescape(strings.Split(body[8], "=")[1])
@@ -154,8 +161,8 @@ func main() {
 		} else if text == "sgcs" {
 			boardType = "학과소식"
 		}
-		var api = slack.New(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
 		// fmt.Println(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
+		var api = slack.New(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
 		if cmd[1:] == "on" {
 			// fmt.Println(body)
 			if updateDB.AddChannel(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]), strings.Split(body[1], "=")[1], channelID, text) {
@@ -167,9 +174,11 @@ func main() {
 				// 	str := string(respBody)
 				// 	fmt.Println(str)
 				// }
+				// fmt.Println(channelID)
 				_, _, err = api.PostMessage(channelID, slack.MsgOptionText(boardType+" 업데이트에 대한 알림을 받습니다.", false))
 				ErrCheck(err)
 			} else {
+				// fmt.Println(channelID)
 				_, _, err := api.PostMessage(channelID, slack.MsgOptionText("이미 "+boardType+" 업데이트에 대한 알림을 받고 있습니다.", false))
 				ErrCheck(err)
 			}

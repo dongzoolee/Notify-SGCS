@@ -1,0 +1,8 @@
+version: "3.2"
+services:
+  notify_sgcs:
+    image: notify_sgcs
+    container_name: notify_sgcs
+    restart: always
+    ports:
+      - "4567:4567"

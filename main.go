@@ -164,7 +164,8 @@ func main() {
 		// fmt.Println(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
 		var api = slack.New(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
 		if cmd[1:] == "on" {
-			// fmt.Println(body)
+			// api.PostMessage(channelID, slack.MsgOptionText("유지보수 중입니다 잠시 후 시도해주세요", false))
+			// return
 			if updateDB.AddChannel(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]), strings.Split(body[1], "=")[1], channelID, text) {
 				// resp, err := http.PostForm("https://slack.com/api/chat.postMessage", url.Values{"token": {"xoxb-1691653951013-1729473312866-18XAO49tpUhwGWVgvy1IrLsa"}, "channel": {channelID}, "blocks": {`[{"type": "section", "text": {"type": "plain_text", "text": "Hello world"}}]`}})
 				// ErrCheck(err)
@@ -183,6 +184,8 @@ func main() {
 				ErrCheck(err)
 			}
 		} else if cmd[1:] == "off" {
+			// api.PostMessage(channelID, slack.MsgOptionText("유지보수 중입니다 잠시 후 시도해주세요", false))
+			// return
 			if updateDB.RemoveChannel(channelID, text) {
 				api.PostMessage(channelID, slack.MsgOptionText(boardType+" 업데이트에 대한 알림을 더 이상 받지 않습니다.", false))
 				ErrCheck(err)

@@ -2,8 +2,9 @@ package checkupdate
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
-	"slackApi"
+	SlackApi "slackApi"
 	"strings"
 	"time"
 	"updateDB"
@@ -45,7 +46,7 @@ func ErrCheck(e error) {
 }
 func Init() {
 
-	t := time.NewTicker(3 * time.Minute)
+	t := time.NewTicker(5 * time.Minute)
 	for range t.C {
 		MapDatas("main")
 		MapDatas("underg")
@@ -109,46 +110,130 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 	doc := soup.HTMLParse(resp)
 	lis := doc.Find("div", "class", "list_box").FindAll("li")
 
-	var newTopPostID string
+	var newStrongTopPostID = oldStrongTopPostID
+	var newGeneralTopPostID = oldGeneralTopPostID
 	var ret []BoardItems
 	var isUpdated bool = false
+	var case1 bool = false
+	var case2 bool = false
+	var isCase2TopIdx bool = true
+	var generalPostCnt int = 0
 	for idx, li := range lis {
 		href := li.Find("div").Find("a").Attrs()["href"]
+		title := li.Find("div").Find("a").Text()
+		strong := li.Find("div").Find("a").Find("strong")
 		splitedHref := strings.Split(href, "&")
 		postID := strings.Split(splitedHref[len(splitedHref)-1], "=")[1]
 		if idx == 0 {
-			newTopPostID = postID
-		}
+			// [공지]라면
+			if strong.Error == nil {
+				// 업데이트가 됐다
+				if oldStrongTopPostID != postID {
+					tmp := new(BoardItems)
+					tmp.Title = title
+					tmp.Url = "https://cs.sogang.ac.kr" + href
+					ret = append(ret, *tmp)
 
-		if postID != oldTopStrongPostID { // 업데이트된 게시글을 배열에 저장
-			tmp := new(BoardItems)
-			tmp.Title = li.Find("div").Find("a").Text()
-			tmp.Url = "https://cs.sogang.ac.kr" + li.Find("div").Find("a").Attrs()["href"]
-			ret = append(ret, *tmp)
-			isUpdated = true
-		} else if idx == 0 && postID == oldTopStrongPostID { // 제일 위 게시글이 업데이트 되지 않았다면
-			break
-		} else { // 업데이트된 게시글들을 잘 찾다가 기존의 게시물을 만난다면
-			break
+					isUpdated = true
+					newStrongTopPostID = postID
+					case1 = true
+				} else { // 업데이트 안됐으니 일반공지 돌자
+					case2 = true
+				}
+			} else { // 일반공지라면
+				//업데이트 됐다
+				if oldGeneralTopPostID != postID {
+					tmp := new(BoardItems)
+					tmp.Title = title
+					tmp.Url = "https://cs.sogang.ac.kr" + href
+					ret = append(ret, *tmp)
+
+					isUpdated = true
+					isCase2TopIdx = false
+					newGeneralTopPostID = postID
+					case2 = true
+				} else { // 업데이트 안됐다
+					oldStrongTopPostID = "-1"
+					break
+				}
+			}
+			continue
+		}
+		// fmt.Println(strong.Error)
+		// [공지]라면
+		if strong.Error == nil {
+			// [공지]가 업데이트 됐었음
+			if case1 {
+				// 이번 것도 업데이트 된 건지 확인
+				if oldStrongTopPostID != postID {
+					fmt.Println(postID)
+					tmp := new(BoardItems)
+					tmp.Title = title
+					tmp.Url = "https://cs.sogang.ac.kr" + href
+					ret = append(ret, *tmp)
+				} else { // 안됐다면 case1 종료
+					case1 = false
+					case2 = true
+				}
+			} else if case2 { // 일반 공지를 돌아야 함
+			}
+		} else { // 일반 공지
+			generalPostCnt++ // 일반 공지 1페이지에 몇개 있는지
+
+			// 일단 일반 공지 첫번째 idx를 확인
+			if isCase2TopIdx {
+				// 첫번째 공지가 업데이트된 상태일 경우
+				if oldGeneralTopPostID != postID {
+					tmp := new(BoardItems)
+					tmp.Title = title
+					tmp.Url = "https://cs.sogang.ac.kr" + href
+					ret = append(ret, *tmp)
+
+					isUpdated = true
+					newGeneralTopPostID = postID
+				} else { // 첫번째 공지가 업데이트 x일 경우
+					break
+				}
+				isCase2TopIdx = false
+			} else {
+				// 아직도 업데이트된 게시글일 경우
+				if oldGeneralTopPostID != postID {
+					tmp := new(BoardItems)
+					tmp.Title = title
+					tmp.Url = "https://cs.sogang.ac.kr" + href
+					ret = append(ret, *tmp)
+				} else { // 드디어 기존 공지를 만났을 경우
+					break
+				}
+			}
 		}
 	}
-
+	if case1 && generalPostCnt == 0 { // 2페이지로 일반공지가 넘어갔을 경우
+		fmt.Println("페이지 넘어감 ㅜ")
+		return false, ret
+	}
 	if !isUpdated {
 		return false, ret
 	}
 	// reflect to json and save file
 	if boardType == "main" {
-		unMshedD1.Main = newTopPostID
+		unMshedD1.Strong.Main = newStrongTopPostID
+		unMshedD1.General.Main = newGeneralTopPostID
 	} else if boardType == "underg" {
-		unMshedD1.Underg = newTopPostID
+		unMshedD1.Strong.Underg = newStrongTopPostID
+		unMshedD1.General.Underg = newGeneralTopPostID
 	} else if boardType == "grad" {
-		unMshedD1.Grad = newTopPostID
+		unMshedD1.Strong.Grad = newStrongTopPostID
+		unMshedD1.General.Grad = newGeneralTopPostID
 	} else if boardType == "general" {
-		unMshedD1.General = newTopPostID
+		unMshedD1.Strong.General = newStrongTopPostID
+		unMshedD1.General.General = newGeneralTopPostID
 	} else if boardType == "job" {
-		unMshedD1.Job = newTopPostID
+		unMshedD1.Strong.Job = newStrongTopPostID
+		unMshedD1.General.Job = newGeneralTopPostID
 	} else if boardType == "sgcs" {
-		unMshedD1.Sgcs = newTopPostID
+		unMshedD1.Strong.Sgcs = newStrongTopPostID
+		unMshedD1.General.Sgcs = newGeneralTopPostID
 	}
 
 	mshedD1, err := json.Marshal(unMshedD1)

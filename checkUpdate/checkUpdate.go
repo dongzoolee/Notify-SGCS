@@ -16,12 +16,22 @@ type BoardItems struct {
 	Url   string
 }
 type PKID struct {
-	Main    string
-	Underg  string
-	Grad    string
-	General string
-	Job     string
-	Sgcs    string
+	Strong struct {
+		Main    string `json:"Main"`
+		Underg  string `json:"Underg"`
+		Grad    string `json:"Grad"`
+		General string `json:"General"`
+		Job     string `json:"Job"`
+		Sgcs    string `json:"Sgcs"`
+	} `json:"strong"`
+	General struct {
+		Main    string `json:"Main"`
+		Underg  string `json:"Underg"`
+		Grad    string `json:"Grad"`
+		General string `json:"General"`
+		Job     string `json:"Job"`
+		Sgcs    string `json:"Sgcs"`
+	} `json:"general"`
 }
 type ChannelWrap struct {
 	ChannelID string
@@ -34,7 +44,7 @@ func ErrCheck(e error) {
 	}
 }
 func Init() {
-	
+
 	t := time.NewTicker(3 * time.Minute)
 	for range t.C {
 		MapDatas("main")
@@ -64,27 +74,34 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 	unMshedD1 := new(PKID)
 	json.Unmarshal([]byte(d1), &unMshedD1)
 	// Get Latest crawled post's ID
-	var oldTopPostID string
+	var oldStrongTopPostID string
+	var oldGeneralTopPostID string
 	// Set Board Type's ID
 	var boardID string
 	if boardType == "main" {
 		boardID = "1905"
-		oldTopPostID = unMshedD1.Main
+		oldStrongTopPostID = unMshedD1.Strong.Main
+		oldGeneralTopPostID = unMshedD1.General.Main
 	} else if boardType == "underg" {
 		boardID = "1745"
-		oldTopPostID = unMshedD1.Underg
+		oldStrongTopPostID = unMshedD1.Strong.Underg
+		oldGeneralTopPostID = unMshedD1.General.Underg
 	} else if boardType == "grad" {
 		boardID = "1747"
-		oldTopPostID = unMshedD1.Grad
+		oldStrongTopPostID = unMshedD1.Strong.Grad
+		oldGeneralTopPostID = unMshedD1.General.Grad
 	} else if boardType == "general" {
 		boardID = "1746"
-		oldTopPostID = unMshedD1.General
+		oldStrongTopPostID = unMshedD1.Strong.General
+		oldGeneralTopPostID = unMshedD1.General.General
 	} else if boardType == "job" {
 		boardID = "1748"
-		oldTopPostID = unMshedD1.Job
+		oldStrongTopPostID = unMshedD1.Strong.Job
+		oldGeneralTopPostID = unMshedD1.General.Job
 	} else if boardType == "sgcs" {
 		boardID = "1749"
-		oldTopPostID = unMshedD1.Sgcs
+		oldStrongTopPostID = unMshedD1.Strong.Sgcs
+		oldGeneralTopPostID = unMshedD1.General.Sgcs
 	}
 
 	resp, err := soup.Get("https://cs.sogang.ac.kr/front/cmsboardlist.do?siteId=cs&bbsConfigFK=" + boardID)
@@ -103,13 +120,13 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 			newTopPostID = postID
 		}
 
-		if postID != oldTopPostID { // 업데이트된 게시글을 배열에 저장
+		if postID != oldTopStrongPostID { // 업데이트된 게시글을 배열에 저장
 			tmp := new(BoardItems)
 			tmp.Title = li.Find("div").Find("a").Text()
 			tmp.Url = "https://cs.sogang.ac.kr" + li.Find("div").Find("a").Attrs()["href"]
 			ret = append(ret, *tmp)
 			isUpdated = true
-		} else if idx == 0 && postID == oldTopPostID { // 제일 위 게시글이 업데이트 되지 않았다면
+		} else if idx == 0 && postID == oldTopStrongPostID { // 제일 위 게시글이 업데이트 되지 않았다면
 			break
 		} else { // 업데이트된 게시글들을 잘 찾다가 기존의 게시물을 만난다면
 			break
@@ -133,7 +150,7 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 	} else if boardType == "sgcs" {
 		unMshedD1.Sgcs = newTopPostID
 	}
-	
+
 	mshedD1, err := json.Marshal(unMshedD1)
 	ErrCheck(err)
 	err = ioutil.WriteFile("./checkUpdate/pkid.json", mshedD1, 0644)

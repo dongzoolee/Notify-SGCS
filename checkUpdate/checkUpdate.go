@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 	"updateDB"
-
+	"log"
 	"github.com/anaskhan96/soup"
 )
 
@@ -40,13 +40,16 @@ type ChannelWrap struct {
 }
 
 func ErrCheck(e error) {
+	fmt.Print(time.Now())
 	if e != nil {
-		panic(e)
+		fmt.Println("FAIL")
+		log.Panic(e)
+	}else{
+		fmt.Println("SUCCESS")
 	}
 }
 func Init() {
-
-	t := time.NewTicker(5 * time.Minute)
+	t := time.NewTicker(30 * time.Minute)
 	for range t.C {
 		MapDatas("main")
 		MapDatas("underg")
@@ -104,7 +107,7 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 		oldStrongTopPostID = unMshedD1.Strong.Sgcs
 		oldGeneralTopPostID = unMshedD1.General.Sgcs
 	}
-
+	
 	resp, err := soup.Get("https://cs.sogang.ac.kr/front/cmsboardlist.do?siteId=cs&bbsConfigFK=" + boardID)
 	ErrCheck(err)
 	doc := soup.HTMLParse(resp)

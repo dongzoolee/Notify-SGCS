@@ -31,7 +31,7 @@ func AddChannel(teamToken string, teamID string, channelID string, boardType str
 		return false
 	}
 
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp(leed.at:3306)/"+goDotEnvVar("MYSQL_DB"))
+	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
 	ErrCheck(err)
 	rows, err := db.Query("SELECT EXISTS (SELECT * FROM "+boardType+"Notice WHERE channelID = ?) AS chk", channelID)
 	ErrCheck(err)
@@ -71,7 +71,7 @@ func AddChannel(teamToken string, teamID string, channelID string, boardType str
 	return false
 }
 func RemoveChannel(channelID string, boardType string) bool {
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp(leed.at:3306)/"+goDotEnvVar("MYSQL_DB"))
+	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
 	ErrCheck(err)
 	rows, err := db.Query("SELECT EXISTS (SELECT * FROM "+boardType+"Notice WHERE channelID = ?) AS chk", channelID)
 	ErrCheck(err)
@@ -91,7 +91,7 @@ func RemoveChannel(channelID string, boardType string) bool {
 	return false
 }
 func GetChannels(boardType string) []ChannelWrap {
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp(leed.at:3306)/"+goDotEnvVar("MYSQL_DB"))
+	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
 	ErrCheck(err)
 	rows, err := db.Query("SELECT channelID, teamInfo.teamToken FROM " + boardType + "Notice JOIN teamInfo ON " + boardType + "Notice.teamIdx = teamInfo.idx")
 	ErrCheck(err)
@@ -107,7 +107,7 @@ func GetChannels(boardType string) []ChannelWrap {
 	return channelIDList
 }
 func SetTeamToken(teamID string, teamToken string) bool {
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp(leed.at:3306)/"+goDotEnvVar("MYSQL_DB"))
+	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
 	ErrCheck(err)
 
 	rows, err := db.Query("SELECT EXISTS (SELECT * FROM teamInfo WHERE teamID = ?) AS chk", teamID)
@@ -135,7 +135,7 @@ func SetTeamToken(teamID string, teamToken string) bool {
 	return true
 }
 func GetTeamToken(teamID string) string {
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp(leed.at:3306)/"+goDotEnvVar("MYSQL_DB"))
+	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
 	ErrCheck(err)
 	rows, err := db.Query("SELECT teamToken FROM teamInfo WHERE teamID = ?", teamID)
 	ErrCheck(err)

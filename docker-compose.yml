@@ -6,3 +6,5 @@ services:
     restart: always
     ports:
       - "4567:4567"
+    volumes:
+      - "/home/ubuntu/docker/html/sgcs_notice/checkUpdate:/home/ubuntu/golang/checkUpdate"

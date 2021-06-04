@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	SlackApi "slackApi"
 	"strings"
 	"time"
 	"updateDB"
-	"log"
+
 	"github.com/anaskhan96/soup"
 )
 
@@ -40,12 +41,8 @@ type ChannelWrap struct {
 }
 
 func ErrCheck(e error) {
-	fmt.Print(time.Now())
 	if e != nil {
-		fmt.Println("FAIL")
 		log.Panic(e)
-	}else{
-		fmt.Println("SUCCESS")
 	}
 }
 func Init() {
@@ -107,9 +104,11 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 		oldStrongTopPostID = unMshedD1.Strong.Sgcs
 		oldGeneralTopPostID = unMshedD1.General.Sgcs
 	}
-	
+	// fmt.Print(time.Now())
 	resp, err := soup.Get("https://cs.sogang.ac.kr/front/cmsboardlist.do?siteId=cs&bbsConfigFK=" + boardID)
 	ErrCheck(err)
+	// fmt.Println("SUCCESS")
+	fmt.Println("boardID: " + boardID + ", oldStrID: " + oldStrongTopPostID + ", oldGenID: " + oldGeneralTopPostID)
 	doc := soup.HTMLParse(resp)
 	lis := doc.Find("div", "class", "list_box").FindAll("li")
 
@@ -137,10 +136,14 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 					tmp.Url = "https://cs.sogang.ac.kr" + href
 					ret = append(ret, *tmp)
 
+					fmt.Println("StrongPost Updated. Appending Queue : " + postID)
+
 					isUpdated = true
 					newStrongTopPostID = postID
 					case1 = true
 				} else { // 업데이트 안됐으니 일반공지 돌자
+					fmt.Println("StrongPost Nothing Updated. Starting Case2 : " + postID)
+
 					case2 = true
 				}
 			} else { // 일반공지라면
@@ -151,12 +154,16 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 					tmp.Url = "https://cs.sogang.ac.kr" + href
 					ret = append(ret, *tmp)
 
+					fmt.Println("GeneralPost Updated. Appending Queue : " + postID)
+
 					isUpdated = true
 					isCase2TopIdx = false
 					newGeneralTopPostID = postID
 					case2 = true
 				} else { // 업데이트 안됐다
-					oldStrongTopPostID = "-1"
+					// oldStrongTopPostID = "-1" 굳이?
+					fmt.Println("GeneralPost Nothing Updated. Stopping Loop : " + postID)
+
 					break
 				}
 			}
@@ -169,12 +176,14 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 			if case1 {
 				// 이번 것도 업데이트 된 건지 확인
 				if oldStrongTopPostID != postID {
-					fmt.Println(postID)
+					fmt.Println("StrongPost Still Being Updated. Appending Queue : " + postID)
 					tmp := new(BoardItems)
 					tmp.Title = title
 					tmp.Url = "https://cs.sogang.ac.kr" + href
 					ret = append(ret, *tmp)
 				} else { // 안됐다면 case1 종료
+					fmt.Println("StrongPost Nothing More To Append. Closing Case1 And Start Case2 : " + postID)
+
 					case1 = false
 					case2 = true
 				}
@@ -192,9 +201,12 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 					tmp.Url = "https://cs.sogang.ac.kr" + href
 					ret = append(ret, *tmp)
 
+					fmt.Println("GeneralPost Still Being Updated. Appending Queue : " + postID)
+
 					isUpdated = true
 					newGeneralTopPostID = postID
 				} else { // 첫번째 공지가 업데이트 x일 경우
+					fmt.Println("GeneralPost Nothing To Append. Stopping Loop : " + postID)
 					break
 				}
 				isCase2TopIdx = false
@@ -205,12 +217,18 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 					tmp.Title = title
 					tmp.Url = "https://cs.sogang.ac.kr" + href
 					ret = append(ret, *tmp)
+
+					fmt.Println("GeneralPost Still Being Updated. Appending Queue : " + postID)
+
 				} else { // 드디어 기존 공지를 만났을 경우
+					fmt.Println("GeneralPost Nothing More To Append. Stopping Loop : " + postID)
+
 					break
 				}
 			}
 		}
 	}
+
 	if case1 && generalPostCnt == 0 { // 2페이지로 일반공지가 넘어갔을 경우
 		fmt.Println("페이지 넘어감 ㅜ")
 		return false, ret
@@ -218,6 +236,7 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 	if !isUpdated {
 		return false, ret
 	}
+
 	// reflect to json and save file
 	if boardType == "main" {
 		unMshedD1.Strong.Main = newStrongTopPostID

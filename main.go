@@ -37,6 +37,8 @@ func Getenv(key string) string {
 var api = slack.New(Getenv("BOT_TOKEN"))
 
 func main() {
+	// SlackApi.SendMsg(*new(updateDB.ChannelWrap), "", "FA 대상자입니다", "주소")
+
 	h := mux.NewRouter()
 	go checkupdate.Init()
 
@@ -140,7 +142,7 @@ func main() {
 		var channelID string
 		if strings.Split(body[4], "=")[1] == "directmessage" {
 			channelID = strings.Split(body[5], "=")[1]
-		}else{ // 일반 채널은 채널 ID로 메세지를 보내야 합니다.
+		} else { // 일반 채널은 채널 ID로 메세지를 보내야 합니다.
 			channelID = strings.Split(body[3], "=")[1]
 		}
 		cmd, err := url.QueryUnescape(strings.Split(body[7], "=")[1])

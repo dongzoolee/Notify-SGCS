@@ -1,12 +1,8 @@
 package checkupdate
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"log"
 	SlackApi "slackApi"
-	"strings"
 	"time"
 	"updateDB"
 
@@ -47,17 +43,53 @@ func ErrCheck(e error) {
 }
 func Init() {
 	t := time.NewTicker(30 * time.Minute)
+	// run intervally
 	for range t.C {
-		MapDatas("main")
-		MapDatas("underg")
-		MapDatas("grad")
-		MapDatas("general")
-		MapDatas("job")
-		MapDatas("sgcs")
+		boards := updateDB.FindBoards()
+		for _, board := range boards {
+			var channelIDList = updateDB.GetChannels([]string{board.Name})
+			items := findUpdatedArticle(board.Link, board.LastNotified)
+			for _, receiverInfo := range channelIDList {
+				for _, val := range items {
+					SlackApi.SendMsg(receiverInfo, board.Name, val.Title, val.Url)
+				}
+			}
+		}
 	}
 }
+func findUpdatedArticle(link string, lastNotified time.Time) []BoardItems {
+	toReturn := []BoardItems{}
+
+	// get all articles in page
+	resp, err := soup.Get(link)
+	ErrCheck(err)
+	docs := soup.HTMLParse(resp)
+	notices := docs.Find("table").FindAll("tr", "class", "notice")
+	for _, tr := range notices {
+		// get article title and link
+		href := tr.Find("div").Find("a").Attrs()["href"]
+		title := tr.Find("div").Find("a").Text()
+
+		// get upload date
+		articleResp, err := soup.Get(href)
+		article := soup.HTMLParse(articleResp)
+		uploadDate := article.Find("div", "class", "post_info").Find("div", "class", "info").FindAll("span")[1].Text()
+
+		// format upload date
+		const format = "2006.01.02 15:04:00"
+		parsedUploadDate, err := time.Parse(format, uploadDate)
+		ErrCheck(err)
+
+		// check if upload is after lastNotifed
+		if parsedUploadDate.After(lastNotified) {
+			item := BoardItems{Title: title, Url: href}
+			toReturn = append(toReturn, item)
+		}
+	}
+	return toReturn
+}
 func MapDatas(boardType string) {
-	var channelIDList = updateDB.GetChannels(boardType)
+	var channelIDList = updateDB.GetChannels([]string{boardType})
 	chk, ret := CmpPKID(boardType)
 	if chk {
 		for _, receiverInfo := range channelIDList {
@@ -67,7 +99,8 @@ func MapDatas(boardType string) {
 		}
 	}
 }
-func CmpPKID(boardType string) (bool, []BoardItems) {
+
+/*func CmpPKID(boardType string) (bool, []BoardItems) {
 	d1, err := ioutil.ReadFile("./checkUpdate/pkid.json")
 	ErrCheck(err)
 	// fmt.Println(string(d1))
@@ -264,3 +297,4 @@ func CmpPKID(boardType string) (bool, []BoardItems) {
 	ErrCheck(err)
 	return true, ret
 }
+*/

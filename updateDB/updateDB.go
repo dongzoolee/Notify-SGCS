@@ -4,15 +4,22 @@ import (
 	"database/sql"
 	"log"
 	"os"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
-
 )
 
 type ChannelWrap struct {
 	ChannelID string
 	TeamToken string
+}
+type Board struct {
+	ID           int
+	Name         string
+	Link         string
+	IsCsBoard    bool
+	LastNotified time.Time
 }
 
 func goDotEnvVar(key string) string {
@@ -22,21 +29,44 @@ func goDotEnvVar(key string) string {
 	}
 	return os.Getenv(key)
 }
-func ErrCheck(e error) {
+func openDB() *sql.DB {
+	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
+	ErrCheck(err)
+	return db
+}
+func ErrCheck(e error) bool {
 	if e != nil {
 		panic(e)
+		return true
 	}
+	return false
 }
-func AddChannel(teamToken string, teamID string, channelID string, boardType string) bool {
+func FindBoards() []Board {
+	db := openDB()
+	rows, err := db.Query("SELECT * FROM board_list")
+	ErrCheck(err)
+	defer db.Close()
+	defer rows.Close()
+
+	ret := []Board{}
+	item := Board{}
+	for rows.Next() {
+		err = rows.Scan(&item)
+		ErrCheck(err)
+		ret = append(ret, item)
+	}
+
+	return ret
+}
+func InsertChannel(teamToken string, teamID string, channelID string, boardType string) bool {
 	if boardType == "" {
 		return false
 	}
-
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
-	ErrCheck(err)
-	rows, err := db.Query("SELECT EXISTS (SELECT * FROM "+boardType+"Notice WHERE channelID = ?) AS chk", channelID)
+	db := openDB()
+	rows, err := db.Query("SELECT EXISTS (SELECT * FROM subscription WHERE channelID=? AND boardType=(SELECT id FROM board_list WHERE name=?)) AS chk", channelID, boardType)
 	ErrCheck(err)
 	defer db.Close()
+	defer rows.Close()
 
 	var ret bool
 	for rows.Next() {
@@ -46,6 +76,8 @@ func AddChannel(teamToken string, teamID string, channelID string, boardType str
 	if ret == false {
 		res, err := db.Query("SELECT EXISTS (SELECT * FROM teamInfo WHERE teamID = ?) AS chk", teamID)
 		ErrCheck(err)
+		defer res.Close()
+
 		var chk bool
 		for res.Next() {
 			err = res.Scan(&chk)
@@ -58,25 +90,28 @@ func AddChannel(teamToken string, teamID string, channelID string, boardType str
 		}
 		res, err = db.Query("SELECT idx FROM teamInfo WHERE teamID = ?", teamID)
 		ErrCheck(err)
+		defer res.Close()
+
 		var idx int
 		for res.Next() {
 			err = res.Scan(&idx)
 			ErrCheck(err)
 		}
-		// fmt.Println(idx)
-		res, err = db.Query("INSERT INTO "+boardType+"Notice(channelID, teamIdx) VALUES(?, ?)", channelID, idx)
+
+		res, err = db.Query("INSERT INTO subscription(boardType, channelID, teamID) VALUES(?, ?, ?)", boardType, channelID, idx)
 		ErrCheck(err)
-		res.Close()
+		defer res.Close()
+
 		return true
 	}
 	return false
 }
-func RemoveChannel(channelID string, boardType string) bool {
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
-	ErrCheck(err)
-	rows, err := db.Query("SELECT EXISTS (SELECT * FROM "+boardType+"Notice WHERE channelID = ?) AS chk", channelID)
+func DeleteChannel(channelID string, boardType string) bool {
+	db := openDB()
+	rows, err := db.Query("SELECT EXISTS (SELECT * FROM subscription WHERE channelID=? AND boardType=(SELECT id FROM board_list WHERE name=?)) AS chk", channelID, boardType)
 	ErrCheck(err)
 	defer db.Close()
+	defer rows.Close()
 
 	var ret bool
 	for rows.Next() {
@@ -84,24 +119,23 @@ func RemoveChannel(channelID string, boardType string) bool {
 		ErrCheck(err)
 	}
 	if ret == true {
-		res, err := db.Query("DELETE FROM "+boardType+"Notice WHERE channelID = ?", channelID)
+		res, err := db.Query("DELETE FROM subscription WHERE channelID=? AND boardType=(SELECT id FROM board_list WHERE name=?)", channelID, boardType)
 		ErrCheck(err)
-		res.Close()
+		defer res.Close()
 		return true
 	}
 	return false
 }
 
-func GetChannels(boardType []string) []ChannelWrap {
+func FindChannels(boardType []string) []ChannelWrap {
 	var channelIDList []ChannelWrap
-
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
-	ErrCheck(err)
+	db := openDB()
+	defer db.Close()
 
 	for _, board := range boardType {
-		rows, err := db.Query("SELECT channelID, teamInfo.teamToken FROM " + board + "Notice JOIN teamInfo ON " + board + "Notice.teamIdx = teamInfo.idx")
+		rows, err := db.Query("SELECT channelID, teamInfo.teamToken FROM subscription JOIN teamInfo ON subscription.teamID = teamInfo.idx WHERE boardType=(SELECT id FROM board_list WHERE name=?)", board)
 		ErrCheck(err)
-		defer db.Close()
+		defer rows.Close()
 
 		for rows.Next() {
 			tmp := new(ChannelWrap)
@@ -114,11 +148,12 @@ func GetChannels(boardType []string) []ChannelWrap {
 	return channelIDList
 }
 func SetTeamToken(teamID string, teamToken string) bool {
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
-	ErrCheck(err)
+	db := openDB()
 
 	rows, err := db.Query("SELECT EXISTS (SELECT * FROM teamInfo WHERE teamID = ?) AS chk", teamID)
 	ErrCheck(err)
+	defer rows.Close()
+	defer db.Close()
 
 	var chk bool
 	for rows.Next() {
@@ -126,7 +161,7 @@ func SetTeamToken(teamID string, teamToken string) bool {
 		ErrCheck(err)
 	}
 
-	// TeamID is alreay in DB
+	// TeamID is already in DB
 	if chk == true {
 		rows, err = db.Query("UPDATE teamInfo SET teamToken = ? WHERE teamID = ?", teamToken, teamID)
 		ErrCheck(err)
@@ -142,11 +177,12 @@ func SetTeamToken(teamID string, teamToken string) bool {
 	return true
 }
 func GetTeamToken(teamID string) string {
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
-	ErrCheck(err)
+	db := openDB()
+
 	rows, err := db.Query("SELECT teamToken FROM teamInfo WHERE teamID = ?", teamID)
 	ErrCheck(err)
 	defer db.Close()
+	defer rows.Close()
 
 	var Token string
 	for rows.Next() {

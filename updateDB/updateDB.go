@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
+
 )
 
 type ChannelWrap struct {
@@ -90,20 +91,26 @@ func RemoveChannel(channelID string, boardType string) bool {
 	}
 	return false
 }
-func GetChannels(boardType string) []ChannelWrap {
+
+func GetChannels(boardType []string) []ChannelWrap {
+	var channelIDList []ChannelWrap
+
 	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
 	ErrCheck(err)
-	rows, err := db.Query("SELECT channelID, teamInfo.teamToken FROM " + boardType + "Notice JOIN teamInfo ON " + boardType + "Notice.teamIdx = teamInfo.idx")
-	ErrCheck(err)
-	defer db.Close()
 
-	var channelIDList []ChannelWrap
-	for rows.Next() {
-		tmp := new(ChannelWrap)
-		err = rows.Scan(&tmp.ChannelID, &tmp.TeamToken)
+	for _, board := range boardType {
+		rows, err := db.Query("SELECT channelID, teamInfo.teamToken FROM " + board + "Notice JOIN teamInfo ON " + board + "Notice.teamIdx = teamInfo.idx")
 		ErrCheck(err)
-		channelIDList = append(channelIDList, *tmp)
+		defer db.Close()
+
+		for rows.Next() {
+			tmp := new(ChannelWrap)
+			err = rows.Scan(&tmp.ChannelID, &tmp.TeamToken)
+			ErrCheck(err)
+			channelIDList = append(channelIDList, *tmp)
+		}
 	}
+
 	return channelIDList
 }
 func SetTeamToken(teamID string, teamToken string) bool {

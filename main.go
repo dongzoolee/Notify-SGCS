@@ -40,7 +40,7 @@ func main() {
 	// SlackApi.SendMsg(*new(updateDB.ChannelWrap), "", "FA 대상자입니다", "주소")
 
 	h := mux.NewRouter()
-	go checkupdate.Init()
+	go checkupdate.FetchIntervally()
 
 	// INIT SLACK API
 	signingSecret := Getenv("SLACK_SIGNING_SECRET")
@@ -147,52 +147,32 @@ func main() {
 		}
 		cmd, err := url.QueryUnescape(strings.Split(body[7], "=")[1])
 		ErrCheck(err)
-		text, err := url.QueryUnescape(strings.Split(body[8], "=")[1])
+		boardName, err := url.QueryUnescape(strings.Split(body[8], "=")[1])
 		ErrCheck(err)
-		var boardType string
-		if text == "main" {
-			boardType = "주요공지"
-		} else if text == "underg" {
-			boardType = "학부공지"
-		} else if text == "grad" {
-			boardType = "대학원공지"
-		} else if text == "general" {
-			boardType = "일반공지"
-		} else if text == "job" {
-			boardType = "취업/인턴십공지"
-		} else if text == "sgcs" {
-			boardType = "학과소식"
+
+		boards := updateDB.GetBoardByName(boardName)
+		if len(boards) == 0 {
+			_, _, err = api.PostMessage(channelID, slack.MsgOptionText("유효하지 않은 명령입니다.", false))
+			ErrCheck(err)
+			return
 		}
-		// fmt.Println(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
+		board := boards[0]
+
 		var api = slack.New(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
 		if cmd[1:] == "on" {
-			// api.PostMessage(channelID, slack.MsgOptionText("유지보수 중입니다 잠시 후 시도해주세요", false))
-			// return
-			if updateDB.AddChannel(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]), strings.Split(body[1], "=")[1], channelID, text) {
-				// resp, err := http.PostForm("https://slack.com/api/chat.postMessage", url.Values{"token": {"xoxb-1691653951013-1729473312866-18XAO49tpUhwGWVgvy1IrLsa"}, "channel": {channelID}, "blocks": {`[{"type": "section", "text": {"type": "plain_text", "text": "Hello world"}}]`}})
-				// ErrCheck(err)
-				// respBody, err := ioutil.ReadAll(resp.Body)
-				// ErrCheck(err)
-				// if err == nil {
-				// 	str := string(respBody)
-				// 	fmt.Println(str)
-				// }
-				// fmt.Println(channelID)
-				_, _, err = api.PostMessage(channelID, slack.MsgOptionText(boardType+" 업데이트에 대한 알림을 받습니다.", false))
+			if updateDB.InsertChannel(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]), strings.Split(body[1], "=")[1], channelID, boardName) {
+				_, _, err = api.PostMessage(channelID, slack.MsgOptionText(board.NameKor+" 업데이트에 대한 알림을 받습니다.", false))
 				ErrCheck(err)
 			} else {
-				// fmt.Println(channelID)
-				_, _, err := api.PostMessage(channelID, slack.MsgOptionText("이미 "+boardType+" 업데이트에 대한 알림을 받고 있습니다.", false))
+				_, _, err := api.PostMessage(channelID, slack.MsgOptionText("이미 "+board.NameKor+" 업데이트에 대한 알림을 받고 있습니다.", false))
 				ErrCheck(err)
 			}
 		} else if cmd[1:] == "off" {
-			// api.PostMessage(channelID, slack.MsgOptionText("유지보수 중입니다 잠시 후 시도해주세요", false))
-			// return
-			if updateDB.RemoveChannel(channelID, text) {
-				api.PostMessage(channelID, slack.MsgOptionText(boardType+" 업데이트에 대한 알림을 더 이상 받지 않습니다.", false))
+			if updateDB.DeleteChannel(channelID, boardName) {
+				api.PostMessage(channelID, slack.MsgOptionText(board.NameKor+" 업데이트에 대한 알림을 더 이상 받지 않습니다.", false))
 				ErrCheck(err)
 			} else {
-				api.PostMessage(channelID, slack.MsgOptionText("이미 "+boardType+" 업데이트에 대한 알림을 받지 않고 있습니다.", false))
+				api.PostMessage(channelID, slack.MsgOptionText("이미 "+board.NameKor+" 업데이트에 대한 알림을 받지 않고 있습니다.", false))
 				ErrCheck(err)
 			}
 		}

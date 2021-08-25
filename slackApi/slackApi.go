@@ -21,30 +21,17 @@ func ErrCheck(e error) {
 		panic(e)
 	}
 }
-func SendMsg(receiverInfo updateDB.ChannelWrap, boardType string, title string, url string) {
-	if boardType == "main" {
-		boardType = "주요공지"
-	} else if boardType == "underg" {
-		boardType = "학부공지"
-	} else if boardType == "grad" {
-		boardType = "대학원공지"
-	} else if boardType == "general" {
-		boardType = "일반공지"
-	} else if boardType == "job" {
-		boardType = "취업/인턴십공지"
-	} else if boardType == "sgcs" {
-		boardType = "학과소식"
-	}
+func SendMessage(receiverInfo updateDB.ChannelWrap, boardName string, title string, url string) {
 	var api = slack.New(receiverInfo.TeamToken)
 	// var blocks []slack.Block
 	// blocks=append(blocks, slack.)
-	// blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "*"+boardType+"가 업데이트 되었습니다.*", false, false), nil, nil))
+	// blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "*"+boardName+"가 업데이트 되었습니다.*", false, false), nil, nil))
 	// blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("plain_text", "학부야", false, false), nil, nil))
 	// blocks = append(blocks, slack.NewDividerBlock())
 	// blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "<"+url+"|"+title+">", false, false), nil, nil))
 	// api.PostMessage(receiverInfo.ChannelID, slack.MsgOptionBlocks(blocks...))
 
 	var attch []slack.Attachment
-	attch = append(attch, slack.Attachment{Pretext: boardType + "가 업데이트 되었습니다.", Title: title, TitleLink: url})
+	attch = append(attch, slack.Attachment{Pretext: boardName + "가 업데이트 되었습니다.", Title: title, TitleLink: url})
 	api.PostMessage(receiverInfo.ChannelID, slack.MsgOptionAttachments(attch...))
 }

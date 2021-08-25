@@ -152,6 +152,7 @@ func main() {
 
 		boards := updateDB.GetBoardByName(boardName)
 		if len(boards) == 0 {
+			var api = slack.New(updateDB.GetTeamToken(strings.Split(body[1], "=")[1]))
 			_, _, err = api.PostMessage(channelID, slack.MsgOptionText("유효하지 않은 명령입니다.", false))
 			ErrCheck(err)
 			return

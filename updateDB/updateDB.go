@@ -17,6 +17,7 @@ type ChannelWrap struct {
 type Board struct {
 	ID           int
 	Name         string
+	NameKor      string
 	Link         string
 	IsCsBoard    bool
 	LastNotified time.Time
@@ -30,7 +31,7 @@ func goDotEnvVar(key string) string {
 	return os.Getenv(key)
 }
 func openDB() *sql.DB {
-	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB"))
+	db, err := sql.Open("mysql", goDotEnvVar("MYSQL_ID")+":"+goDotEnvVar("MYSQL_PW")+"@tcp("+goDotEnvVar("MYSQL_HOST")+")/"+goDotEnvVar("MYSQL_DB")+"?parseTime=true")
 	ErrCheck(err)
 	return db
 }
@@ -40,6 +41,23 @@ func ErrCheck(e error) bool {
 		return true
 	}
 	return false
+}
+func GetBoardByName(boardName string) []Board {
+	db := openDB()
+	rows, err := db.Query("SELECT * FROM board_list WHERE name=?", boardName)
+	ErrCheck(err)
+	defer db.Close()
+	defer rows.Close()
+
+	ret := []Board{}
+	item := Board{}
+	for rows.Next() {
+		err = rows.Scan(&item.ID, &item.Name, &item.NameKor, &item.Link, &item.IsCsBoard, &item.LastNotified)
+		ErrCheck(err)
+		ret = append(ret, item)
+	}
+
+	return ret
 }
 func FindBoards() []Board {
 	db := openDB()
@@ -51,7 +69,7 @@ func FindBoards() []Board {
 	ret := []Board{}
 	item := Board{}
 	for rows.Next() {
-		err = rows.Scan(&item)
+		err = rows.Scan(&item.ID, &item.Name, &item.NameKor, &item.Link, &item.IsCsBoard, &item.LastNotified)
 		ErrCheck(err)
 		ret = append(ret, item)
 	}

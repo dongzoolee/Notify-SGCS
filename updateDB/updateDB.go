@@ -116,7 +116,8 @@ func InsertChannel(teamToken string, teamID string, channelID string, boardType 
 			ErrCheck(err)
 		}
 
-		res, err = db.Query("INSERT INTO subscription(boardType, channelID, teamID) VALUES(?, ?, ?)", boardType, channelID, idx)
+
+		res, err = db.Query("INSERT INTO subscription(boardType, channelID, teamID) VALUES((SELECT id FROM board_list WHERE name=?), ?, ?)", boardType, channelID, idx)
 		ErrCheck(err)
 		defer res.Close()
 

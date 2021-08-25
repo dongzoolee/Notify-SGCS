@@ -1,12 +1,11 @@
 package checkupdate
 
 import (
+	"github.com/anaskhan96/soup"
 	"log"
 	SlackApi "slackApi"
 	"time"
 	"updateDB"
-
-	"github.com/anaskhan96/soup"
 )
 
 type BoardItems struct {
@@ -41,42 +40,59 @@ func ErrCheck(e error) {
 		log.Panic(e)
 	}
 }
-func Init() {
+func FetchIntervally() {
 	t := time.NewTicker(30 * time.Minute)
 	// run intervally
 	for range t.C {
 		boards := updateDB.FindBoards()
-		for _, board := range boards {
-			var channelIDList = updateDB.GetChannels([]string{board.Name})
-			items := findUpdatedArticle(board.Link, board.LastNotified)
-			for _, receiverInfo := range channelIDList {
-				for _, val := range items {
-					SlackApi.SendMsg(receiverInfo, board.Name, val.Title, val.Url)
-				}
+		CheckBoardsAndNotify(boards)
+	}
+}
+func CheckBoardsAndNotify(boards []updateDB.Board) {
+	for _, board := range boards {
+		var channelIDList = updateDB.FindChannels([]string{board.Name})
+		items := FindUpdatedArticle(board.Link, board.IsCsBoard, board.LastNotified)
+		for _, receiverInfo := range channelIDList {
+			for _, val := range items {
+				SlackApi.SendMessage(receiverInfo, board.NameKor, val.Title, val.Url)
 			}
 		}
 	}
 }
-func findUpdatedArticle(link string, lastNotified time.Time) []BoardItems {
+func FindUpdatedArticle(link string, isCsBoard bool, lastNotified time.Time) []BoardItems {
 	toReturn := []BoardItems{}
 
 	// get all articles in page
 	resp, err := soup.Get(link)
 	ErrCheck(err)
 	docs := soup.HTMLParse(resp)
-	notices := docs.Find("table").FindAll("tr", "class", "notice")
+
+	var notices []soup.Root
+	if isCsBoard {
+		notices = docs.Find("div", "class", "list_box").FindAll("li")
+	} else {
+		notices = docs.Find("div", "class", "bbs-list").FindAll("tr", "class", "notice")
+	}
 	for _, tr := range notices {
 		// get article title and link
 		href := tr.Find("div").Find("a").Attrs()["href"]
 		title := tr.Find("div").Find("a").Text()
 
 		// get upload date
-		articleResp, err := soup.Get(href)
-		article := soup.HTMLParse(articleResp)
-		uploadDate := article.Find("div", "class", "post_info").Find("div", "class", "info").FindAll("span")[1].Text()
-
+		uploadDate := ""
+		if isCsBoard {
+			articleResp, err := soup.Get("https://cs.sogang.ac.kr" + href)
+			ErrCheck(err)
+			article := soup.HTMLParse(articleResp)
+			uploadDate = article.Find("div", "class", "post_info").Find("div", "class", "info").FindAll("span")[1].Text()
+		} else {
+			articleResp, err := soup.Get("https://sogang.ac.kr" + href)
+			ErrCheck(err)
+			article := soup.HTMLParse(articleResp)
+			uploadDate = article.Find("div", "class", "info").FindAll("div", "class", "unit")[1].Find("span", "class", "value").Text()
+		}
 		// format upload date
-		const format = "2006.01.02 15:04:00"
+		const format = "2006.01.02 15:04:05"
 		parsedUploadDate, err := time.Parse(format, uploadDate)
 		ErrCheck(err)
 
@@ -88,17 +104,18 @@ func findUpdatedArticle(link string, lastNotified time.Time) []BoardItems {
 	}
 	return toReturn
 }
-func MapDatas(boardType string) {
-	var channelIDList = updateDB.GetChannels([]string{boardType})
+
+/*func MapDatas(boardType string) {
+	var channelIDList = updateDB.FindChannels([]string{boardType})
 	chk, ret := CmpPKID(boardType)
 	if chk {
 		for _, receiverInfo := range channelIDList {
 			for _, val := range ret {
-				SlackApi.SendMsg(receiverInfo, boardType, val.Title, val.Url)
+				SlackApi.SendMessage(receiverInfo, boardType, val.Title, val.Url)
 			}
 		}
 	}
-}
+}*/
 
 /*func CmpPKID(boardType string) (bool, []BoardItems) {
 	d1, err := ioutil.ReadFile("./checkUpdate/pkid.json")

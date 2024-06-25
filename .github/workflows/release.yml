@@ -1,0 +1,77 @@
+name: Deploy
+on:
+  push:
+    branches: [release]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Create .env file
+        run: |
+          touch .env
+          echo "SLACK_SIGNING_SECRET=$SLACK_SIGNING_SECRET" >> .env
+          echo "BOT_TOKEN=$BOT_TOKEN" >> .env
+          echo "SLACK_CLIENT_ID=$SLACK_CLIENT_ID" >> .env
+          echo "SLACK_CLIENT_SECRET=$SLACK_CLIENT_SECRET" >> .env
+          echo "MYSQL_ID=$MYSQL_ID" >> .env
+          echo "MYSQL_PW=$MYSQL_PW" >> .env
+          echo "MYSQL_HOST=$MYSQL_HOST" >> .env
+          echo "MYSQL_DB=$MYSQL_DB" >> .env
+        env:
+          SLACK_SIGNING_SECRET: ${{ secrets.SLACK_SIGNING_SECRET }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
+          SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}
+          MYSQL_ID: ${{ secrets.MYSQL_ID }}
+          MYSQL_PW: ${{ secrets.MYSQL_PW }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_DB: ${{ secrets.MYSQL_DB }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1.6.0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-northeast-2
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push image to ECR - client
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: notify-sgcs
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -f ./Dockerfile .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v0.1.4
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+          REPOSITORY: notify-sgcs
+          PORT_: 4567
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          envs: REGISTRY, TAG, REPOSITORY, PORT_
+          script: |
+            aws ecr get-login-password --region ap-northeast-2 \
+              | docker login --username AWS --password-stdin 889566267001.dkr.ecr.ap-northeast-2.amazonaws.com
+
+            if [ "$( docker container inspect -f '{{.State.Status}}' $REPOSITORY )" == "running" ]; then 
+              docker container stop $REPOSITORY
+              docker container rm $REPOSITORY -f
+            fi
+            docker image rmi $(docker images '$REGISTRY/$REPOSITORY')
+            docker pull $REGISTRY/$REPOSITORY:$TAG
+            docker run -d --name $REPOSITORY --restart=always -p $PORT_:$PORT_ $REGISTRY/$REPOSITORY:$TAG

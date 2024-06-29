@@ -21,17 +21,17 @@ func ErrCheck(e error) {
 		panic(e)
 	}
 }
-func SendMessage(receiverInfo updateDB.ChannelWrap, boardName string, title string, url string) {
+func SendMessage(receiverInfo updateDB.ChannelWrap, boardName string, title string, url string) slack.Attachment {
 	var api = slack.New(receiverInfo.TeamToken)
-	// var blocks []slack.Block
-	// blocks=append(blocks, slack.)
-	// blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "*"+boardName+"가 업데이트 되었습니다.*", false, false), nil, nil))
-	// blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("plain_text", "학부야", false, false), nil, nil))
-	// blocks = append(blocks, slack.NewDividerBlock())
-	// blocks = append(blocks, slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "<"+url+"|"+title+">", false, false), nil, nil))
-	// api.PostMessage(receiverInfo.ChannelID, slack.MsgOptionBlocks(blocks...))
 
-	var attch []slack.Attachment
-	attch = append(attch, slack.Attachment{Pretext: boardName + "가 업데이트 되었습니다.", Title: title, TitleLink: url})
-	api.PostMessage(receiverInfo.ChannelID, slack.MsgOptionAttachments(attch...))
+	var attachment = slack.Attachment{Pretext: boardName + "가 업데이트 되었습니다.", Title: title, TitleLink: url}
+	_, _, err := api.PostMessage(receiverInfo.ChannelID, slack.MsgOptionAttachments(
+		[]slack.Attachment{attachment}...,
+	))
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return attachment
 }

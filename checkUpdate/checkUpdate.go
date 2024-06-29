@@ -1,11 +1,12 @@
 package checkupdate
 
 import (
-	"github.com/anaskhan96/soup"
 	"log"
 	SlackApi "slackApi"
 	"time"
 	"updateDB"
+
+	"github.com/anaskhan96/soup"
 )
 
 type BoardItems struct {
@@ -54,7 +55,7 @@ func CheckBoardsAndNotify(boards []updateDB.Board) {
 		items := FindUpdatedArticle(board.Link, board.IsCsBoard, board.LastNotified)
 		for _, receiverInfo := range channelIDList {
 			for _, val := range items {
-				SlackApi.SendMessage(receiverInfo, board.NameKor, val.Title, val.Url)
+				SlackApi.SendMessage(receiverInfo, board.NameKor, val.Title, "https://cs.sogang.ac.kr"+val.Url)
 			}
 		}
 	}

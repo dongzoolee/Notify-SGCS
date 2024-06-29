@@ -56,6 +56,7 @@ func CheckBoardsAndNotify(boards []updateDB.Board) {
 		for _, receiverInfo := range channelIDList {
 			for _, val := range items {
 				SlackApi.SendMessage(receiverInfo, board.NameKor, val.Title, "https://cs.sogang.ac.kr"+val.Url)
+				updateDB.UpdateBoardLastNotifiedField(board.ID)
 			}
 		}
 	}

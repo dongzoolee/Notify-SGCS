@@ -76,6 +76,13 @@ func FindBoards() []Board {
 
 	return ret
 }
+func UpdateBoardLastNotifiedField(boardID int) {
+	db := openDB()
+	rows, err := db.Query("UPDATE board_list SET lastNotified = NOW() WHERE id=?", boardID)
+	ErrCheck(err)
+	defer db.Close()
+	defer rows.Close()
+}
 func InsertChannel(teamToken string, teamID string, channelID string, boardType string) bool {
 	if boardType == "" {
 		return false
@@ -115,7 +122,6 @@ func InsertChannel(teamToken string, teamID string, channelID string, boardType 
 			err = res.Scan(&idx)
 			ErrCheck(err)
 		}
-
 
 		res, err = db.Query("INSERT INTO subscription(boardType, channelID, teamID) VALUES((SELECT id FROM board_list WHERE name=?), ?, ?)", boardType, channelID, idx)
 		ErrCheck(err)
